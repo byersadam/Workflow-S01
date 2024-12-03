@@ -23,8 +23,9 @@ jobs:
 
     - name: Start MySQL with Docker
       run: |
-        docker run --name mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=wordpress -d -p 3306:3306 mysql:8.0
-        sleep 30 # Wait for MySQL to fully start
+        docker pull mysql:8.0
+        docker run --name mysql-container -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=wordpress -d -p 3306:3306 mysql:8.0
+        sleep 30 # Wait for MySQL to start
 
     - name: Install WordPress
       run: |
