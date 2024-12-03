@@ -26,11 +26,18 @@ jobs:
           sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';"
           sudo mysql -e "FLUSH PRIVILEGES;"
           sudo mysql -e "CREATE DATABASE wordpress;"
+          
+          # Create the runner user
+          sudo mysql -u root -e "CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';"
+          # Grant privileges to the runner user
+          sudo mysql -u root -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost';"
+          # Flush privileges
+          sudo mysql -u root -e "FLUSH PRIVILEGES;"
 
       # Step 3: Verify MySQL Service
       - name: Verify MySQL Setup
         run: |
-          sudo mysql -u root -e "SHOW DATABASES;"
+          sudo mysql -u runner -prunner_password -e "SHOW DATABASES;"
 
       # Step 4: Install PHP and Dependencies
       - name: Install PHP and dependencies
@@ -45,8 +52,8 @@ jobs:
           mv wordpress/* .
           cp wp-config-sample.php wp-config.php
           sed -i "s/database_name_here/wordpress/" wp-config.php
-          sed -i "s/username_here/root/" wp-config.php
-          sed -i "s/password_here//" wp-config.php
+          sed -i "s/username_here/runner/" wp-config.php
+          sed -i "s/password_here/runner_password/" wp-config.php
           php -S 127.0.0.1:8080 &
 
       # Step 6: Wait for WordPress to be Ready
