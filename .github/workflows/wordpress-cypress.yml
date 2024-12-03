@@ -23,19 +23,13 @@ jobs:
 
     - name: Install and Configure MySQL
       run: |
-        # Install MySQL
         sudo apt-get update
         sudo apt-get install -y mysql-server
         sudo service mysql start
-
-        # Configure MySQL root user with a password
         sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';"
+        sudo mysql -e "CREATE DATABASE wordpress;"
+        sudo mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost' IDENTIFIED BY 'runner_password';"
         sudo mysql -e "FLUSH PRIVILEGES;"
-
-        # Create a new database and grant privileges to the 'runner' user
-        sudo mysql -u root -proot -e "CREATE DATABASE wordpress;"
-        sudo mysql -u root -proot -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost' IDENTIFIED BY 'runner_password';"
-        sudo mysql -u root -proot -e "FLUSH PRIVILEGES;"
 
     - name: Install WordPress
       run: |
@@ -48,6 +42,15 @@ jobs:
         sed -i "s/password_here/runner_password/" wp-config.php
         sed -i "s/localhost/127.0.0.1/" wp-config.php
         php -S 127.0.0.1:8080 > /dev/null 2>&1 &
+
+    - name: Verify wp-config.php
+      run: |
+        ls -la
+        cat wp-config.php
+
+    - name: Test Database Connection
+      run: |
+        mysql -u runner -prunner_password -e "SHOW DATABASES;"
 
     - name: Install Cypress Dependencies
       run: |
