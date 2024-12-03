@@ -22,24 +22,30 @@ jobs:
         run: |
           echo "### Debug: Checking MySQL installation and service status ###"
           dpkg -l | grep mysql || echo "MySQL is not installed"
-          sudo service mysql status || echo "MySQL service is not running"
 
-          # Start MySQL service and wait until it's fully started
-          sudo service mysql start
-          echo "### Debug: MySQL service started ###"
-          sleep 10  # Give MySQL sufficient time to initialize
+          # Ensure MySQL service is not running before setup
+          sudo service mysql stop || echo "MySQL service already stopped"
 
-          # Debug: Check MySQL logs to confirm service status
-          echo "### Debug: Printing MySQL logs ###"
-          sudo cat /var/log/mysql/error.log || echo "No MySQL error logs found"
+          # Initialize MySQL with a new root password and plugin setting
+          echo "### Debug: Initializing MySQL root authentication ###"
+          sudo mysqld_safe --skip-grant-tables &  # Skip authentication for root access
+          sleep 10  # Give MySQL time to initialize
 
-          # Reset root user authentication to use mysql_native_password
-          echo "### Debug: Resetting root user authentication ###"
-          sudo mysql --user=root <<EOF
-          UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root';
+          # Change authentication plugin and set password
+          echo "### Debug: Resetting root authentication ###"
+          mysql --user=root <<EOF
+          UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root' AND host = 'localhost';
           ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';
           FLUSH PRIVILEGES;
           EOF
+
+          # Stop the skip-grant-tables MySQL instance
+          sudo killall mysqld_safe
+          sleep 5
+
+          # Start MySQL normally
+          sudo service mysql start
+          sleep 10
 
           # Verify root user authentication
           echo "### Debug: Testing root user authentication ###"
@@ -59,6 +65,7 @@ jobs:
           EOF
 
           echo "### Debug: MySQL setup complete ###"
+
 
       # Step 3: Verify MySQL Service
       - name: Verify MySQL Setup
