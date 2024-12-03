@@ -28,13 +28,12 @@ jobs:
         sudo apt-get install -y mysql-server
         sudo service mysql start
 
-        # Switch to root user and configure MySQL
-        echo "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root';" | sudo mysql
-        echo "FLUSH PRIVILEGES;" | sudo mysql
-        echo "CREATE DATABASE wordpress;" | sudo mysql
+        # Force the MySQL root user to use password authentication
+        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';"
+        sudo mysql -e "FLUSH PRIVILEGES;"
 
-        # Allow root user to connect without password (if needed)
-        echo "[client]\nuser=root\npassword=root" | sudo tee ~/.my.cnf > /dev/null
+        # Create the WordPress database
+        sudo mysql -u root -proot -e "CREATE DATABASE wordpress;"
 
     - name: Install WordPress
       run: |
