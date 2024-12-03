@@ -21,18 +21,20 @@ jobs:
       with:
         php-version: 8.0
 
-    - name: Install MySQL
+    - name: Install and Configure MySQL
       run: |
+        # Install MySQL
         sudo apt-get update
         sudo apt-get install -y mysql-server
         sudo service mysql start
 
-        # Configure MySQL root user without a password
-        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';"
-        sudo mysql -e "FLUSH PRIVILEGES;"
+        # Switch to root user and configure MySQL
+        echo "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root';" | sudo mysql
+        echo "FLUSH PRIVILEGES;" | sudo mysql
+        echo "CREATE DATABASE wordpress;" | sudo mysql
 
-        # Create the WordPress database
-        mysql -u root -e "CREATE DATABASE wordpress;"
+        # Allow root user to connect without password (if needed)
+        echo "[client]\nuser=root\npassword=root" | sudo tee ~/.my.cnf > /dev/null
 
     - name: Install WordPress
       run: |
@@ -42,7 +44,7 @@ jobs:
         cp wp-config-sample.php wp-config.php
         sed -i "s/database_name_here/wordpress/" wp-config.php
         sed -i "s/username_here/root/" wp-config.php
-        sed -i "s/password_here//" wp-config.php
+        sed -i "s/password_here/root/" wp-config.php
         php -S 127.0.0.1:8080 > /dev/null 2>&1 &
 
     - name: Install Cypress Dependencies
