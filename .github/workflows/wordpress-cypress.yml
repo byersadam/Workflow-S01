@@ -97,7 +97,9 @@ jobs:
           fi
 
           # Start PHP built-in server
-          if ! php -S 127.0.0.1:8080 & then
+          php -S 127.0.0.1:8080 &
+          sleep 5  # Wait for the server to initialize
+          if ! curl -s http://127.0.0.1:8080; then
             echo "Failed to start PHP server" && exit 1
           fi
 
