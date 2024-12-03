@@ -20,53 +20,26 @@ jobs:
       # Step 2: Install and Configure MySQL
       - name: Install and Configure MySQL
         run: |
-          echo "### Debug: Checking MySQL installation and service status ###"
           dpkg -l | grep mysql || echo "MySQL is not installed"
-
-          # Stop MySQL service if running
-          echo "### Debug: Stopping MySQL service ###"
-          sudo service mysql stop || echo "MySQL service already stopped"
-
-          # Ensure the socket directory exists and is owned by MySQL
-          echo "### Debug: Ensuring /var/run/mysqld directory exists ###"
+          sudo service mysql stop || true
           if [ ! -d /var/run/mysqld ]; then
             sudo mkdir -p /var/run/mysqld
             sudo chown mysql:mysql /var/run/mysqld
           fi
-
-          # Start MySQL with skip-grant-tables for root access
-          echo "### Debug: Starting MySQL with skip-grant-tables ###"
           sudo mysqld_safe --skip-grant-tables &
-          sleep 10  # Wait for MySQL to initialize
-
-          # Change root user plugin and set password
-          echo "### Debug: Resetting root user authentication ###"
+          sleep 10
           mysql --user=root <<EOF
           UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root';
-          SET PASSWORD FOR 'root'@'localhost' = PASSWORD('root_password');
+          ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';
           FLUSH PRIVILEGES;
           EOF
-
-          # Verify root user authentication directly in skip-grant-tables mode
-          echo "### Debug: Testing root user authentication ###"
-          if ! mysql -uroot -proot_password -e "SELECT VERSION();"; then
-            echo "Root authentication failed. Debugging..."
-            mysql --user=root <<EOF
-            SELECT user, host, plugin FROM mysql.user;
-            EOF
-            exit 1
-          fi
-
-          # Create WordPress database and configure runner user
-          echo "### Debug: Creating WordPress database and runner user ###"
+          mysql -uroot -proot_password -e "SELECT VERSION();"
           mysql --user=root <<EOF
           CREATE DATABASE wordpress;
           CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';
           GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost';
           FLUSH PRIVILEGES;
           EOF
-
-          echo "### Debug: MySQL setup complete ###"
 
 
       # Step 3: Verify MySQL Service
