@@ -23,29 +23,38 @@ jobs:
           echo "### Debug: Checking MySQL installation and service status ###"
           dpkg -l | grep mysql || echo "MySQL is not installed"
 
-          # Ensure MySQL service is not running before setup
+          # Stop MySQL service if running
           sudo service mysql stop || echo "MySQL service already stopped"
 
-          # Initialize MySQL with a new root password and plugin setting
-          echo "### Debug: Initializing MySQL root authentication ###"
-          sudo mysqld_safe --skip-grant-tables &  # Skip authentication for root access
-          sleep 10  # Give MySQL time to initialize
+          # Ensure the socket directory exists
+          echo "### Debug: Ensuring /var/run/mysqld directory exists ###"
+          if [ ! -d /var/run/mysqld ]; then
+            sudo mkdir -p /var/run/mysqld
+            sudo chown mysql:mysql /var/run/mysqld
+          fi
 
-          # Change authentication plugin and set password
-          echo "### Debug: Resetting root authentication ###"
+          # Start MySQL with skip-grant-tables for root access
+          echo "### Debug: Starting MySQL with skip-grant-tables ###"
+          sudo mysqld_safe --skip-grant-tables &
+          sleep 10  # Wait for MySQL to initialize
+
+          # Change root plugin and set password
+          echo "### Debug: Resetting root user authentication ###"
           mysql --user=root <<EOF
-          UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root' AND host = 'localhost';
+          UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root';
           ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';
           FLUSH PRIVILEGES;
           EOF
 
-          # Stop the skip-grant-tables MySQL instance
+          # Stop the temporary MySQL instance
+          echo "### Debug: Stopping temporary MySQL instance ###"
           sudo killall mysqld_safe
           sleep 5
 
-          # Start MySQL normally
+          # Restart MySQL service normally
+          echo "### Debug: Restarting MySQL service ###"
           sudo service mysql start
-          sleep 10
+          sleep 10  # Wait for service to initialize
 
           # Verify root user authentication
           echo "### Debug: Testing root user authentication ###"
@@ -65,6 +74,7 @@ jobs:
           EOF
 
           echo "### Debug: MySQL setup complete ###"
+
 
 
       # Step 3: Verify MySQL Service
