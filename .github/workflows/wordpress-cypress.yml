@@ -23,15 +23,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mysql-server
           sudo service mysql start
-          # Use the default root user with an empty password
-          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '';"
+          
+          # Ensure the root user uses the native password plugin and set an empty password
+          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';"
           sudo mysql -e "FLUSH PRIVILEGES;"
+          
           # Create the WordPress database
           sudo mysql -e "CREATE DATABASE wordpress;"
+          
           # Create and configure the runner user
           sudo mysql -e "CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';"
           sudo mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost';"
           sudo mysql -e "FLUSH PRIVILEGES;"
+          
+          # Ensure the root user can connect without a password
+          echo "[client]" > ~/.my.cnf
+          echo "user=root" >> ~/.my.cnf
+          echo "password=" >> ~/.my.cnf
+
 
       # Step 3: Verify MySQL Service
       - name: Verify MySQL Setup
