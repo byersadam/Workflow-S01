@@ -24,9 +24,10 @@ jobs:
           dpkg -l | grep mysql || echo "MySQL is not installed"
 
           # Stop MySQL service if running
+          echo "### Debug: Stopping MySQL service ###"
           sudo service mysql stop || echo "MySQL service already stopped"
 
-          # Ensure the socket directory exists
+          # Ensure the socket directory exists and is owned by MySQL
           echo "### Debug: Ensuring /var/run/mysqld directory exists ###"
           if [ ! -d /var/run/mysqld ]; then
             sudo mkdir -p /var/run/mysqld
@@ -44,15 +45,22 @@ jobs:
           UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root';
           EOF
 
-          # Stop the temporary MySQL instance
+          # Stop the temporary MySQL instance and clean up residual files
           echo "### Debug: Stopping temporary MySQL instance ###"
-          sudo killall mysqld_safe
+          sudo killall mysqld_safe || echo "No mysqld_safe process to kill"
           sleep 5
+          echo "### Debug: Cleaning up MySQL socket and PID files ###"
+          sudo rm -f /var/run/mysqld/mysqld.sock /var/run/mysqld/mysqld.pid || echo "No leftover files to remove"
 
-          # Start MySQL normally
+          # Restart MySQL service
           echo "### Debug: Restarting MySQL service ###"
           sudo service mysql start
           sleep 10  # Wait for service to initialize
+
+          # Check MySQL service status
+          echo "### Debug: Checking MySQL service status ###"
+          sudo systemctl status mysql.service || echo "MySQL service failed to start"
+          sudo cat /var/log/mysql/error.log || echo "No MySQL error logs found"
 
           # Now set the root password and flush privileges
           echo "### Debug: Setting root password and flushing privileges ###"
@@ -79,8 +87,6 @@ jobs:
           EOF
 
           echo "### Debug: MySQL setup complete ###"
-
-
 
 
       # Step 3: Verify MySQL Service
