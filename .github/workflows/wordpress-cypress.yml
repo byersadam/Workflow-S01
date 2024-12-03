@@ -20,40 +20,29 @@ jobs:
       # Step 2: Install and Configure MySQL
       - name: Install and Configure MySQL
         run: |
-          # Debug: Ensure MySQL is installed and running
           echo "### Debug: Checking MySQL installation and service status ###"
           dpkg -l | grep mysql || echo "MySQL is not installed"
           sudo service mysql status || echo "MySQL service is not running"
 
-          # Start MySQL service
           sudo service mysql start
           echo "### Debug: MySQL service started ###"
 
-          # Debug: Check the MySQL logs to catch startup issues
           echo "### Debug: Printing MySQL error logs ###"
           sudo cat /var/log/mysql/error.log || echo "No MySQL error logs found"
 
-          # Debug: Check current MySQL users and plugins
           echo "### Debug: Existing MySQL users before modification ###"
           sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" || echo "Failed to retrieve MySQL user table"
 
-          # Ensure the root user uses mysql_native_password
-          echo "### Debug: Setting root user plugin to mysql_native_password ###"
-          sudo mysql -e "UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root' AND host = 'localhost';" || echo "Failed to update root user plugin"
+          sudo mysql -e "UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root' AND host = 'localhost';"
+          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';"
+          sudo mysql -e "FLUSH PRIVILEGES;"
 
-          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';" || echo "Failed to set root user password"
-
-          sudo mysql -e "FLUSH PRIVILEGES;" || echo "Failed to flush privileges"
-
-          # Debug: Check if the root user plugin was updated successfully
           echo "### Debug: Checking MySQL users after modification ###"
           sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" || echo "Failed to retrieve MySQL user table after modification"
 
-          # Debug: Test root access
           echo "### Debug: Testing root user authentication ###"
           mysql -uroot -proot_password -e "SELECT VERSION();" || echo "Root user authentication failed"
 
-          # Create WordPress database and configure runner user
           echo "### Debug: Creating WordPress database and runner user ###"
           sudo mysql -uroot -proot_password -e "CREATE DATABASE wordpress;" || echo "Failed to create WordPress database"
           sudo mysql -uroot -proot_password -e "CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';" || echo "Failed to create runner user"
@@ -77,20 +66,57 @@ jobs:
       - name: Set up WordPress
         run: |
           echo "### Debug: Setting up WordPress ###"
-          curl -O https://wordpress.org/latest.tar.gz || echo "Failed to download WordPress"
-          tar -xzf latest.tar.gz || echo "Failed to extract WordPress"
-          mv wordpress/* . || echo "Failed to move WordPress files"
-          cp wp-config-sample.php wp-config.php || echo "Failed to copy wp-config-sample.php to wp-config.php"
-          sed -i "s/database_name_here/wordpress/" wp-config.php || echo "Failed to set database name in wp-config.php"
-          sed -i "s/username_here/runner/" wp-config.php || echo "Failed to set username in wp-config.php"
-          sed -i "s/password_here/runner_password/" wp-config.php || echo "Failed to set password in wp-config.php"
-          php -S 127.0.0.1:8080 & || echo "Failed to start PHP server"
+
+          # Download WordPress
+          if ! curl -O https://wordpress.org/latest.tar.gz; then
+            echo "Failed to download WordPress" && exit 1
+          fi
+
+          # Extract WordPress
+          if ! tar -xzf latest.tar.gz; then
+            echo "Failed to extract WordPress" && exit 1
+          fi
+
+          # Move WordPress files
+          if ! mv wordpress/* .; then
+            echo "Failed to move WordPress files" && exit 1
+          fi
+
+          # Copy wp-config-sample.php to wp-config.php
+          if ! cp wp-config-sample.php wp-config.php; then
+            echo "Failed to copy wp-config-sample.php to wp-config.php" && exit 1
+          fi
+
+          # Set database name in wp-config.php
+          if ! sed -i "s/database_name_here/wordpress/" wp-config.php; then
+            echo "Failed to set database name in wp-config.php" && exit 1
+          fi
+
+          # Set username in wp-config.php
+          if ! sed -i "s/username_here/runner/" wp-config.php; then
+            echo "Failed to set username in wp-config.php" && exit 1
+          fi
+
+          # Set password in wp-config.php
+          if ! sed -i "s/password_here/runner_password/" wp-config.php; then
+            echo "Failed to set password in wp-config.php" && exit 1
+          fi
+
+          # Start PHP built-in server
+          if ! php -S 127.0.0.1:8080 &; then
+            echo "Failed to start PHP server" && exit 1
+          fi
 
       # Step 6: Wait for WordPress to be Ready
       - name: Wait for WordPress Setup
         run: |
           echo "### Debug: Waiting for WordPress to be ready ###"
           for i in {1..10}; do
-            curl -s http://127.0.0.1:8080/wp-admin/install.php && break || echo "Retrying WordPress setup..."
-            sleep 5
+            if curl -s http://127.0.0.1:8080/wp-admin/install.php; then
+              echo "WordPress is ready!"
+              break
+            else
+              echo "Retrying WordPress setup..."
+              sleep 5
+            fi
           done
