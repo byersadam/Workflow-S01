@@ -97,7 +97,7 @@ jobs:
           fi
 
           # Start PHP built-in server
-          if ! php -S 127.0.0.1:8080 &; then
+          if ! php -S 127.0.0.1:8080 & then
             echo "Failed to start PHP server" && exit 1
           fi
 
