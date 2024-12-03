@@ -1,0 +1,57 @@
+name: Setup WordPress and Run Cypress Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  setup-wordpress:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.0
+
+    - name: Install MySQL
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mysql-server
+        sudo service mysql start
+        mysql -e "CREATE DATABASE wordpress;"
+
+    - name: Install WordPress
+      run: |
+        wget https://wordpress.org/latest.tar.gz
+        tar -xvzf latest.tar.gz
+        mv wordpress/* .
+        cp wp-config-sample.php wp-config.php
+        sed -i "s/database_name_here/wordpress/" wp-config.php
+        sed -i "s/username_here/root/" wp-config.php
+        sed -i "s/password_here//" wp-config.php
+        php -S 127.0.0.1:8080 > /dev/null 2>&1 &
+
+    - name: Install Cypress Dependencies
+      run: |
+        sudo apt-get install -y curl
+        curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+        npm install cypress
+
+    - name: Run Cypress Tests
+      run: |
+        npx cypress run --spec "cypress/integration/login.spec.js"
+
+    - name: Archive Test Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: cypress-results
+        path: cypress/results/
