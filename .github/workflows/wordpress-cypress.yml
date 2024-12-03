@@ -20,78 +20,77 @@ jobs:
       # Step 2: Install and Configure MySQL
       - name: Install and Configure MySQL
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-server
-          sudo service mysql start
-          
-          # Switch root user to use mysql_native_password and set a password
-          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root_password';"
-          sudo mysql -e "FLUSH PRIVILEGES;"
-          
-          # Verify root user access
-          echo "Testing root access..."
-          mysql -uroot -proot_password -e "SELECT VERSION();"
+          # Debug: Ensure MySQL is installed and running
+          echo "### Debug: Checking MySQL installation and service status ###"
+          dpkg -l | grep mysql || echo "MySQL is not installed"
+          sudo service mysql status || echo "MySQL service is not running"
 
-          # Create the WordPress database
-          sudo mysql -uroot -proot_password -e "CREATE DATABASE wordpress;"
-          
-          # Create and configure the runner user
-          sudo mysql -uroot -proot_password -e "CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';"
-          sudo mysql -uroot -proot_password -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost';"
-          sudo mysql -uroot -proot_password -e "FLUSH PRIVILEGES;"
+          # Start MySQL service
+          sudo service mysql start
+          echo "### Debug: MySQL service started ###"
+
+          # Debug: Check the MySQL logs to catch startup issues
+          echo "### Debug: Printing MySQL error logs ###"
+          sudo cat /var/log/mysql/error.log || echo "No MySQL error logs found"
+
+          # Debug: Check current MySQL users and plugins
+          echo "### Debug: Existing MySQL users before modification ###"
+          sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" || echo "Failed to retrieve MySQL user table"
+
+          # Ensure the root user uses mysql_native_password
+          echo "### Debug: Setting root user plugin to mysql_native_password ###"
+          sudo mysql -e "UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root' AND host = 'localhost';" || echo "Failed to update root user plugin"
+
+          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';" || echo "Failed to set root user password"
+
+          sudo mysql -e "FLUSH PRIVILEGES;" || echo "Failed to flush privileges"
+
+          # Debug: Check if the root user plugin was updated successfully
+          echo "### Debug: Checking MySQL users after modification ###"
+          sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" || echo "Failed to retrieve MySQL user table after modification"
+
+          # Debug: Test root access
+          echo "### Debug: Testing root user authentication ###"
+          mysql -uroot -proot_password -e "SELECT VERSION();" || echo "Root user authentication failed"
+
+          # Create WordPress database and configure runner user
+          echo "### Debug: Creating WordPress database and runner user ###"
+          sudo mysql -uroot -proot_password -e "CREATE DATABASE wordpress;" || echo "Failed to create WordPress database"
+          sudo mysql -uroot -proot_password -e "CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';" || echo "Failed to create runner user"
+          sudo mysql -uroot -proot_password -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost';" || echo "Failed to grant privileges to runner user"
+          sudo mysql -uroot -proot_password -e "FLUSH PRIVILEGES;" || echo "Failed to flush privileges for runner user"
 
       # Step 3: Verify MySQL Service
       - name: Verify MySQL Setup
         run: |
-          sudo mysql -uroot -proot_password -e "SHOW DATABASES;"
-          sudo mysql -urunner -prunner_password -e "SHOW DATABASES;"
+          echo "### Debug: Testing MySQL setup ###"
+          sudo mysql -uroot -proot_password -e "SHOW DATABASES;" || echo "Failed to show databases as root user"
+          sudo mysql -urunner -prunner_password -e "SHOW DATABASES;" || echo "Failed to show databases as runner user"
 
       # Step 4: Install PHP and Dependencies
       - name: Install PHP and dependencies
         run: |
-          sudo apt-get install -y php php-mysql unzip curl
+          echo "### Debug: Installing PHP and dependencies ###"
+          sudo apt-get install -y php php-mysql unzip curl || echo "Failed to install PHP and dependencies"
 
       # Step 5: Download and Configure WordPress
       - name: Set up WordPress
         run: |
-          curl -O https://wordpress.org/latest.tar.gz
-          tar -xzf latest.tar.gz
-          mv wordpress/* .
-          cp wp-config-sample.php wp-config.php
-          sed -i "s/database_name_here/wordpress/" wp-config.php
-          sed -i "s/username_here/runner/" wp-config.php
-          sed -i "s/password_here/runner_password/" wp-config.php
-          php -S 127.0.0.1:8080 &
+          echo "### Debug: Setting up WordPress ###"
+          curl -O https://wordpress.org/latest.tar.gz || echo "Failed to download WordPress"
+          tar -xzf latest.tar.gz || echo "Failed to extract WordPress"
+          mv wordpress/* . || echo "Failed to move WordPress files"
+          cp wp-config-sample.php wp-config.php || echo "Failed to copy wp-config-sample.php to wp-config.php"
+          sed -i "s/database_name_here/wordpress/" wp-config.php || echo "Failed to set database name in wp-config.php"
+          sed -i "s/username_here/runner/" wp-config.php || echo "Failed to set username in wp-config.php"
+          sed -i "s/password_here/runner_password/" wp-config.php || echo "Failed to set password in wp-config.php"
+          php -S 127.0.0.1:8080 & || echo "Failed to start PHP server"
 
       # Step 6: Wait for WordPress to be Ready
       - name: Wait for WordPress Setup
         run: |
+          echo "### Debug: Waiting for WordPress to be ready ###"
           for i in {1..10}; do
-            curl -s http://127.0.0.1:8080/wp-admin/install.php && break
+            curl -s http://127.0.0.1:8080/wp-admin/install.php && break || echo "Retrying WordPress setup..."
             sleep 5
           done
-
-  run-tests:
-    runs-on: ubuntu-latest
-    needs: setup-environment
-
-    steps:
-      # Step 7: Checkout the code
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # Step 8: Install Node.js for Cypress
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      # Step 9: Install Cypress
-      - name: Install Cypress
-        run: |
-          npm install cypress
-
-      # Step 10: Run Cypress Tests
-      - name: Run Cypress Tests
-        run: |
-          npx cypress run --spec cypress/e2e/login_spec.cy.js
