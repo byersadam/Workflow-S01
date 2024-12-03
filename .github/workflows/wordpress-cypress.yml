@@ -21,19 +21,10 @@ jobs:
       with:
         php-version: 8.0
 
-    - name: Install and Configure MySQL
+    - name: Start MySQL with Docker
       run: |
-        # Install MySQL
-        sudo apt-get update
-        sudo apt-get install -y mysql-server
-        sudo service mysql start
-
-        # Force the MySQL root user to use password authentication
-        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';"
-        sudo mysql -e "FLUSH PRIVILEGES;"
-
-        # Create the WordPress database
-        sudo mysql -u root -proot -e "CREATE DATABASE wordpress;"
+        docker run --name mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=wordpress -d -p 3306:3306 mysql:8.0
+        sleep 30 # Wait for MySQL to fully start
 
     - name: Install WordPress
       run: |
@@ -44,6 +35,7 @@ jobs:
         sed -i "s/database_name_here/wordpress/" wp-config.php
         sed -i "s/username_here/root/" wp-config.php
         sed -i "s/password_here/root/" wp-config.php
+        sed -i "s/localhost/127.0.0.1/" wp-config.php
         php -S 127.0.0.1:8080 > /dev/null 2>&1 &
 
     - name: Install Cypress Dependencies
