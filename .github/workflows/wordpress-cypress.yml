@@ -39,47 +39,27 @@ jobs:
           sudo mysqld_safe --skip-grant-tables &
           sleep 10  # Wait for MySQL to initialize
 
-          # Change root user plugin to mysql_native_password
+          # Change root user plugin and set password
           echo "### Debug: Resetting root user authentication ###"
           mysql --user=root <<EOF
           UPDATE mysql.user SET plugin = 'mysql_native_password' WHERE user = 'root';
-          EOF
-
-          # Stop the temporary MySQL instance and clean up residual files
-          echo "### Debug: Stopping temporary MySQL instance ###"
-          sudo killall mysqld_safe || echo "No mysqld_safe process to kill"
-          sleep 5
-          echo "### Debug: Cleaning up MySQL socket and PID files ###"
-          sudo rm -f /var/run/mysqld/mysqld.sock /var/run/mysqld/mysqld.pid || echo "No leftover files to remove"
-
-          # Restart MySQL service
-          echo "### Debug: Restarting MySQL service ###"
-          sudo service mysql start
-          sleep 10  # Wait for service to initialize
-
-          # Check MySQL service status
-          echo "### Debug: Checking MySQL service status ###"
-          sudo systemctl status mysql.service || echo "MySQL service failed to start"
-          sudo cat /var/log/mysql/error.log || echo "No MySQL error logs found"
-
-          # Now set the root password and flush privileges
-          echo "### Debug: Setting root password and flushing privileges ###"
-          mysql -uroot <<EOF
-          ALTER USER 'root'@'localhost' IDENTIFIED BY 'root_password';
+          SET PASSWORD FOR 'root'@'localhost' = PASSWORD('root_password');
           FLUSH PRIVILEGES;
           EOF
 
-          # Verify root user authentication
+          # Verify root user authentication directly in skip-grant-tables mode
           echo "### Debug: Testing root user authentication ###"
           if ! mysql -uroot -proot_password -e "SELECT VERSION();"; then
             echo "Root authentication failed. Debugging..."
-            sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" || echo "Failed to retrieve user table"
+            mysql --user=root <<EOF
+            SELECT user, host, plugin FROM mysql.user;
+            EOF
             exit 1
           fi
 
           # Create WordPress database and configure runner user
           echo "### Debug: Creating WordPress database and runner user ###"
-          mysql -uroot -proot_password <<EOF
+          mysql --user=root <<EOF
           CREATE DATABASE wordpress;
           CREATE USER 'runner'@'localhost' IDENTIFIED BY 'runner_password';
           GRANT ALL PRIVILEGES ON wordpress.* TO 'runner'@'localhost';
